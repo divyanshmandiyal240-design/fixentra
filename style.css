@@ -56,7 +56,18 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--whi
 .nav-logo em { font-style: normal; color: var(--gray); font-weight: 400; }
 
 .nav-logo-img    { height: 40px; width: auto; display: block; }
-.footer-logo-img { height: 34px; width: auto; display: block; margin-bottom: 1rem; }
+.footer-logo-img { height: 34px; width: auto; display: block; }
+
+/* Inline SVG logo */
+.logo-svg { height: 38px; width: 38px; flex-shrink: 0; }
+.logo-text { display: flex; flex-direction: column; line-height: 1.1; }
+.logo-name { font-size: 1.05rem; font-weight: 800; color: var(--white); letter-spacing: -.3px; }
+.logo-tag  { font-size: .65rem; font-weight: 600; color: #60a5fa; letter-spacing: 1.5px; text-transform: uppercase; }
+
+.footer-logo { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.footer-logo .logo-svg { height: 34px; width: 34px; }
+.footer-logo .logo-name { font-size: .95rem; }
+.footer-logo .logo-tag  { font-size: .6rem; }
 
 .nav-links { display: flex; gap: 2rem; list-style: none; margin-left: auto; }
 .nav-links a {
