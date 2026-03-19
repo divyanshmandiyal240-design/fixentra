@@ -1,3 +1,10 @@
+// ── CLIENT TICKER — duplicate for seamless loop ────────────────────────────
+const track = document.getElementById('clients-track');
+if (track) {
+  const clone = track.innerHTML;
+  track.innerHTML += clone;
+}
+
 // ── NAV SCROLL EFFECT ──────────────────────────────────────────────────────
 const nav = document.getElementById('nav');
 window.addEventListener('scroll', () => {

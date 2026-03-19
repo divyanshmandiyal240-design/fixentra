@@ -220,33 +220,58 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--whi
 .client-pill {
   display: inline-flex;
   align-items: center;
-  padding: .75rem 1.75rem;
+  gap: .85rem;
+  padding: .7rem 1.4rem .7rem .85rem;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 50px;
   text-decoration: none;
-  font-size: .95rem;
-  font-weight: 700;
-  color: var(--white);
   white-space: nowrap;
-  transition: border-color .2s, background .2s, transform .2s;
-  letter-spacing: -.2px;
-}
-
-.client-pill span {
-  font-weight: 400;
-  color: var(--gray);
-  font-size: .85rem;
+  transition: border-color .25s, background .25s, transform .2s, box-shadow .25s;
 }
 
 .client-pill:hover {
-  border-color: rgba(59,130,246,.5);
+  border-color: rgba(59,130,246,.45);
   background: rgba(59,130,246,.06);
-  transform: translateY(-2px);
-  color: #93c5fd;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(37,99,235,.15);
 }
 
-.client-pill:hover span { color: #60a5fa; }
+/* Logo container */
+.client-logo-wrap {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0;
+}
+
+.client-logo {
+  width: 26px; height: 26px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.client-logo-fallback {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: white;
+  font-weight: 800;
+  font-size: .9rem;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Text */
+.client-info { display: flex; flex-direction: column; line-height: 1.2; }
+.client-name   { font-size: .88rem; font-weight: 700; color: var(--white); letter-spacing: -.2px; }
+.client-domain { font-size: .72rem; font-weight: 500; color: var(--gray); }
+
+.client-pill:hover .client-name   { color: #93c5fd; }
+.client-pill:hover .client-domain { color: #60a5fa; }
 
 /* ── SERVICES ── */
 .services { background: var(--surface); }
