@@ -55,6 +55,9 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--whi
 .nav-logo span { font-size: 1rem; font-weight: 700; color: var(--white); }
 .nav-logo em { font-style: normal; color: var(--gray); font-weight: 400; }
 
+.nav-logo-img    { height: 40px; width: auto; display: block; }
+.footer-logo-img { height: 34px; width: auto; display: block; margin-bottom: 1rem; }
+
 .nav-links { display: flex; gap: 2rem; list-style: none; margin-left: auto; }
 .nav-links a {
   text-decoration: none; color: var(--gray); font-size: .9rem; font-weight: 500;

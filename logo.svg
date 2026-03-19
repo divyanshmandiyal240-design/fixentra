@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" fill="none">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- ── ICON MARK ── -->
+  <!-- Outer rounded square -->
+  <rect x="2" y="2" width="88" height="88" rx="22" fill="url(#g1)"/>
+
+  <!-- Inner gloss overlay -->
+  <rect x="2" y="2" width="88" height="44" rx="22" fill="white" fill-opacity="0.08"/>
+
+  <!-- Circuit-style F letter -->
+  <!-- Vertical stem -->
+  <rect x="26" y="26" width="8" height="48" rx="3" fill="white"/>
+  <!-- Top bar -->
+  <rect x="26" y="26" width="34" height="8" rx="3" fill="white"/>
+  <!-- Middle bar -->
+  <rect x="26" y="46" width="26" height="8" rx="3" fill="white"/>
+
+  <!-- Circuit nodes / dots -->
+  <circle cx="60" cy="30" r="4.5" fill="url(#g2)" filter="url(#glow)"/>
+  <circle cx="52" cy="50" r="4.5" fill="url(#g2)" filter="url(#glow)"/>
+  <circle cx="34" cy="74" r="3.5" fill="white" fill-opacity="0.5"/>
+
+  <!-- Accent spark top-right of icon -->
+  <circle cx="78" cy="18" r="5" fill="#06b6d4" fill-opacity="0.9"/>
+  <circle cx="78" cy="18" r="2.5" fill="white"/>
+
+  <!-- ── WORDMARK ── -->
+  <!-- "Fixentra" -->
+  <text x="108" y="58"
+        font-family="Inter, Arial, sans-serif"
+        font-weight="800"
+        font-size="38"
+        letter-spacing="-1"
+        fill="white">Fixentra</text>
+
+  <!-- Tagline / sub-brand -->
+  <text x="110" y="78"
+        font-family="Inter, Arial, sans-serif"
+        font-weight="500"
+        font-size="16"
+        letter-spacing="3"
+        fill="#60a5fa"
+        text-anchor="start">IT SOLUTION</text>
+
+  <!-- Thin accent line under tagline -->
+  <rect x="110" y="83" width="180" height="2" rx="1" fill="url(#g1)" opacity="0.6"/>
+</svg>
