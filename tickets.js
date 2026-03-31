@@ -39,7 +39,16 @@ const K = {
   categories: 'tf_categories',
   clients:    'tf_clients',
   session:    'tf_session',
+  version:    'tf_version',
 };
+
+// If data version is outdated, reset users & session so new seed runs cleanly
+const DATA_VERSION = '2';
+if (localStorage.getItem(K.version) !== DATA_VERSION) {
+  localStorage.removeItem(K.users);
+  localStorage.removeItem(K.session);
+  localStorage.setItem(K.version, DATA_VERSION);
+}
 
 // ── DEFAULT SEED DATA ────────────────────────────────────────────────────────
 function seedData() {
