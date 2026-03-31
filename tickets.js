@@ -44,21 +44,27 @@ const K = {
 // ── DEFAULT SEED DATA ────────────────────────────────────────────────────────
 function seedData() {
   if (!ls(K.clients)) {
-    save(K.clients, [
-      { id:'cl1', name:'Acme Corp',      color:'#6c47ff' },
-      { id:'cl2', name:'TechStart Ltd',  color:'#3b82f6' },
-      { id:'cl3', name:'RetailPlus',     color:'#22c55e' },
-    ]);
+    save(K.clients, []);
   }
   if (!ls(K.users)) {
     save(K.users, [
-      { id:'u1', username:'admin',  password:'admin123',  name:'Admin User',    role:'admin',       clientId:'' },
-      { id:'u2', username:'tech1',  password:'tech123',   name:'Alex (Tech)',   role:'technician',  clientId:'' },
-      { id:'u3', username:'tech2',  password:'tech456',   name:'Sam (Tech)',    role:'technician',  clientId:'' },
-      { id:'u4', username:'user1',  password:'user123',   name:'Divyansh M.',   role:'user',        clientId:'cl1' },
-      { id:'u5', username:'user2',  password:'user456',   name:'Priya K.',      role:'user',        clientId:'cl2' },
+      { id:'u1', username:'admin@fixentra.in', password:'admin123', name:'Admin', role:'admin', clientId:'', mustChangePassword:false },
     ]);
   }
+  // Migrate existing data: add missing fields
+  const users = ls(K.users) || [];
+  let migrated = false;
+  users.forEach(u => {
+    if (u.mustChangePassword === undefined) { u.mustChangePassword = false; migrated = true; }
+  });
+  if (migrated) save(K.users, users);
+
+  const clients = ls(K.clients) || [];
+  let cMigrated = false;
+  clients.forEach(c => {
+    if (c.domain === undefined) { c.domain = ''; cMigrated = true; }
+  });
+  if (cMigrated) save(K.clients, clients);
   if (!ls(K.categories)) {
     save(K.categories, [
       { id:'c1', name:'Bug',              color:'#ef4444' },
@@ -70,13 +76,7 @@ function seedData() {
     ]);
   }
   if (!ls(K.tickets)) {
-    save(K.tickets, [
-      { id:'TF-00001', title:'Login page fails on Safari', description:'Users on Safari 16+ see a blank login page. CORS error in console from auth endpoint.', category:'Bug', priority:'critical', status:'open',        raisedBy:'u4', assignedTo:'u2', clientId:'cl1', createdAt: ago(3) },
-      { id:'TF-00002', title:'Add dark mode toggle',       description:'Users want a dark/light toggle in account settings that persists across sessions.',        category:'Feature Request', priority:'medium', status:'in-progress', raisedBy:'u4', assignedTo:'u2', clientId:'cl1', createdAt: ago(2) },
-      { id:'TF-00003', title:'Dashboard charts slow',      description:'Analytics charts take 6-8 seconds. Suspected unoptimised DB queries.',                    category:'Performance',     priority:'high',   status:'open',        raisedBy:'u5', assignedTo:'',   clientId:'cl2', createdAt: ago(1) },
-      { id:'TF-00004', title:'Update brand colors',        description:'Rebrand rollout — update logo, primary color and all button styles.',                      category:'Design',          priority:'low',    status:'closed',      raisedBy:'u4', assignedTo:'u3', clientId:'cl1', createdAt: ago(5) },
-      { id:'TF-00005', title:'Password reset not sending', description:'Forgot-password flow sends no email. SMTP logs show 550 errors on certain domains.',       category:'Bug',             priority:'high',   status:'in-progress', raisedBy:'u5', assignedTo:'u2', clientId:'cl2', createdAt: ago(4) },
-    ]);
+    save(K.tickets, []);
   }
 }
 
@@ -208,10 +208,10 @@ function initLogin() {
     e.preventDefault();
     const uname = document.getElementById('login-user').value.trim().toLowerCase();
     const pass  = document.getElementById('login-pass').value;
-    let user = getUsers().find(u => u.username === uname && u.password === pass);
+    let user = getUsers().find(u => u.username.toLowerCase() === uname && u.password === pass);
 
     if (!user) {
-      document.getElementById('login-error').textContent = 'Invalid username or password.';
+      document.getElementById('login-error').textContent = 'Invalid email or password.';
       return;
     }
 
@@ -221,9 +221,14 @@ function initLogin() {
       return;
     }
 
-    save(K.session, { id: user.id });
     document.getElementById('login-error').textContent = '';
-    bootApp(user);
+
+    if (user.mustChangePassword) {
+      showChangePasswordScreen(user);
+    } else {
+      save(K.session, { id: user.id });
+      bootApp(user);
+    }
   });
 
   document.getElementById('pw-toggle').addEventListener('click', () => {
@@ -235,11 +240,38 @@ function initLogin() {
 
   document.querySelectorAll('.demo-pill').forEach(pill => {
     pill.addEventListener('click', () => {
-      document.getElementById('login-user').value = pill.dataset.u;
-      document.getElementById('login-pass').value = pill.dataset.p;
+      document.getElementById('login-user').value = pill.dataset.u || '';
+      document.getElementById('login-pass').value = pill.dataset.p || '';
     });
   });
 }
+
+// ── CHANGE PASSWORD SCREEN ───────────────────────────────────────────────────
+let pendingUser = null;
+
+function showChangePasswordScreen(user) {
+  pendingUser = user;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('change-pass-screen').style.display = 'flex';
+}
+
+document.getElementById('change-pass-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const newPass  = document.getElementById('cp-new').value;
+  const confirm  = document.getElementById('cp-confirm').value;
+  const errEl    = document.getElementById('cp-error');
+  if (newPass.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+  if (newPass !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
+  const users = getUsers();
+  const idx   = users.findIndex(u => u.id === pendingUser.id);
+  users[idx]  = { ...users[idx], password: newPass, mustChangePassword: false };
+  save(K.users, users);
+  const updatedUser = users[idx];
+  save(K.session, { id: updatedUser.id });
+  document.getElementById('change-pass-screen').style.display = 'none';
+  pendingUser = null;
+  bootApp(updatedUser);
+});
 
 // ── BOOT APP ─────────────────────────────────────────────────────────────────
 function bootApp(user) {
@@ -682,6 +714,7 @@ function renderUsers() {
       <td>
         <div class="action-btns">
           <button class="btn-icon" onclick="openEditUser('${u.id}')">Edit</button>
+          ${!isSelf ? `<button class="btn-icon" onclick="resetUserPassword('${u.id}')">Reset Password</button>` : ''}
           ${!isSelf ? `<button class="btn-icon del" onclick="deleteUser('${u.id}')">Remove</button>` : ''}
         </div>
       </td>
@@ -702,8 +735,31 @@ document.getElementById('open-add-user').addEventListener('click', () => {
   document.getElementById('user-submit-btn').textContent  = 'Add User';
   document.getElementById('user-form').reset();
   document.getElementById('pw-req').style.display = 'inline';
+  document.getElementById('uf-domain-hint').textContent = '';
+  document.getElementById('uf-domain-hint').style.color = '';
   populateClientDropdown();
   document.getElementById('user-modal-overlay').classList.add('open');
+});
+
+// Auto-detect client from email domain
+document.getElementById('uf-username').addEventListener('input', e => {
+  const email  = e.target.value.trim().toLowerCase();
+  const domain = email.includes('@') ? email.split('@')[1] : '';
+  const hint   = document.getElementById('uf-domain-hint');
+  const sel    = document.getElementById('uf-client');
+  if (domain) {
+    const match = getClients().find(c => c.domain && c.domain.toLowerCase() === domain);
+    if (match) {
+      hint.textContent = '✓ Auto-linked to: ' + match.name;
+      hint.style.color = match.color;
+      sel.value = match.id;
+    } else {
+      hint.textContent = 'No client matches this domain — assign manually below';
+      hint.style.color = 'var(--gray)';
+    }
+  } else {
+    hint.textContent = '';
+  }
 });
 
 function openEditUser(id) {
@@ -718,6 +774,12 @@ function openEditUser(id) {
   document.getElementById('uf-role').value     = u.role;
   document.getElementById('pw-req').style.display = 'none';
   populateClientDropdown(u.clientId || '');
+  // Show domain hint
+  const domain = u.username.includes('@') ? u.username.split('@')[1] : '';
+  const hint   = document.getElementById('uf-domain-hint');
+  const match  = domain ? getClients().find(c => c.domain && c.domain.toLowerCase() === domain) : null;
+  hint.textContent = match ? '✓ Linked to: ' + match.name : '';
+  hint.style.color = match ? match.color : '';
   document.getElementById('user-modal-overlay').classList.add('open');
 }
 
@@ -739,10 +801,10 @@ document.getElementById('user-form').addEventListener('submit', e => {
     showToast('User updated');
   } else {
     if (!pass || pass.length < 6) { alert('Password must be at least 6 characters.'); return; }
-    if (users.find(u=>u.username===username)) { alert('Username already exists.'); return; }
-    users.push({ id:'u'+Date.now(), username, name, password:pass, role, clientId });
+    if (users.find(u=>u.username.toLowerCase()===username)) { alert('Email already exists.'); return; }
+    users.push({ id:'u'+Date.now(), username, name, password:pass, role, clientId, mustChangePassword:true });
     save(K.users, users);
-    showToast('User added');
+    showToast('User added — they must set a new password on first login');
   }
   closeUserModal();
   renderUsers();
@@ -765,6 +827,35 @@ document.getElementById('user-modal-cancel').addEventListener('click', closeUser
 document.getElementById('user-modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('user-modal-overlay')) closeUserModal();
 });
+
+// ── OTP / PASSWORD RESET (Admin) ─────────────────────────────────────────────
+function genOTP() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({length: 10}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function resetUserPassword(id) {
+  const users = getUsers();
+  const idx   = users.findIndex(u => u.id === id);
+  if (idx < 0) return;
+  const otp = genOTP();
+  users[idx] = { ...users[idx], password: otp, mustChangePassword: true };
+  save(K.users, users);
+  // Show OTP modal
+  document.getElementById('otp-email').textContent = users[idx].username;
+  document.getElementById('otp-value').textContent = otp;
+  document.getElementById('otp-copy-btn').textContent = 'Copy OTP';
+  document.getElementById('otp-modal-overlay').classList.add('open');
+}
+
+function copyOTP() {
+  const otp = document.getElementById('otp-value').textContent;
+  navigator.clipboard.writeText(otp).then(() => {
+    const btn = document.getElementById('otp-copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy OTP'; }, 2000);
+  });
+}
 
 // ── CLIENT MANAGEMENT (Admin) ─────────────────────────────────────────────────
 function getPortalUrl(clientId) {
@@ -847,7 +938,8 @@ let selectedClientColor = '#6c47ff';
 
 document.getElementById('open-add-client').addEventListener('click', () => {
   document.getElementById('edit-client-id').value = '';
-  document.getElementById('clf-name').value = '';
+  document.getElementById('clf-name').value   = '';
+  document.getElementById('clf-domain').value = '';
   document.getElementById('client-modal-title').textContent = 'Add Client';
   document.getElementById('client-submit-btn').textContent  = 'Add Client';
   document.getElementById('clf-link-group').style.display  = 'none';
@@ -863,7 +955,8 @@ function openEditClient(id) {
   const c = getClients().find(x=>x.id===id);
   if (!c) return;
   document.getElementById('edit-client-id').value = id;
-  document.getElementById('clf-name').value = c.name;
+  document.getElementById('clf-name').value   = c.name;
+  document.getElementById('clf-domain').value = c.domain || '';
   document.getElementById('client-modal-title').textContent = 'Edit Client';
   document.getElementById('client-submit-btn').textContent  = 'Save Changes';
   selectedClientColor = c.color;
@@ -888,18 +981,19 @@ document.getElementById('client-color-options').addEventListener('click', e => {
 document.getElementById('client-form').addEventListener('submit', e => {
   e.preventDefault();
   const name    = document.getElementById('clf-name').value.trim();
+  const domain  = document.getElementById('clf-domain').value.trim().toLowerCase().replace(/^@/, '');
   const editId  = document.getElementById('edit-client-id').value;
   const clients = getClients();
   let savedId   = editId;
 
   if (editId) {
     const idx = clients.findIndex(c=>c.id===editId);
-    clients[idx] = { ...clients[idx], name, color: selectedClientColor };
+    clients[idx] = { ...clients[idx], name, color: selectedClientColor, domain };
     showToast('Client updated');
   } else {
     if (clients.find(c=>c.name.toLowerCase()===name.toLowerCase())) { alert('Client already exists.'); return; }
     savedId = 'cl' + Date.now();
-    clients.push({ id: savedId, name, color: selectedClientColor });
+    clients.push({ id: savedId, name, color: selectedClientColor, domain });
     showToast('Client added — copy the portal link below!', 'info');
   }
 
@@ -1029,5 +1123,11 @@ initLogin();
 const session = getSession();
 if (session) {
   const user = getUsers().find(u => u.id === session.id);
-  if (user) bootApp(user);
+  if (user) {
+    if (user.mustChangePassword) {
+      showChangePasswordScreen(user);
+    } else {
+      bootApp(user);
+    }
+  }
 }
