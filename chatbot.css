@@ -1,0 +1,230 @@
+/* ── FIXENTRA CHATBOT WIDGET ─────────────────────────────────────────────── */
+
+.cb-btn {
+  position: fixed;
+  bottom: 1.75rem;
+  right: 1.75rem;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 24px rgba(108,71,255,.45);
+  z-index: 9000;
+  transition: transform .2s, box-shadow .2s;
+}
+.cb-btn:hover { transform: scale(1.08); box-shadow: 0 6px 30px rgba(108,71,255,.6); }
+.cb-btn svg   { width: 26px; height: 26px; }
+.cb-btn .ico-chat  { display: block; }
+.cb-btn .ico-close { display: none; }
+.cb-btn.open .ico-chat  { display: none; }
+.cb-btn.open .ico-close { display: block; }
+
+/* Badge */
+.cb-badge {
+  position: absolute;
+  top: -2px; right: -2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid #0d0d0f;
+  display: none;
+}
+.cb-badge.show { display: block; }
+
+/* Window */
+.cb-window {
+  position: fixed;
+  bottom: 5.5rem;
+  right: 1.75rem;
+  width: 370px;
+  height: 520px;
+  background: #16161a;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  z-index: 8999;
+  box-shadow: 0 24px 60px rgba(0,0,0,.55);
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: cbIn .22s ease;
+}
+.cb-window.hidden {
+  display: none;
+}
+@keyframes cbIn {
+  from { opacity:0; transform: scale(.92) translateY(12px); }
+  to   { opacity:1; transform: scale(1)  translateY(0); }
+}
+
+/* Header */
+.cb-header {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: 1rem 1.1rem;
+  background: linear-gradient(135deg,rgba(37,99,235,.12),rgba(124,58,237,.12));
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  flex-shrink: 0;
+}
+.cb-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg,#2563eb,#7c3aed);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cb-avatar svg { width: 20px; height: 20px; fill: white; }
+.cb-hinfo { flex: 1; }
+.cb-hname   { font-size: .88rem; font-weight: 700; color: #fff; }
+.cb-hstatus {
+  font-size: .7rem; color: #22c55e;
+  display: flex; align-items: center; gap: .35rem; margin-top: .1rem;
+}
+.cb-hstatus::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%; background: #22c55e;
+  display: inline-block;
+  animation: cbPulseGreen 2s infinite;
+}
+@keyframes cbPulseGreen {
+  0%,100% { opacity:1; } 50% { opacity:.4; }
+}
+.cb-close {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  color: #888; cursor: pointer;
+  font-size: 1.15rem;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color .2s, background .2s;
+}
+.cb-close:hover { color: #fff; background: rgba(255,255,255,.1); }
+
+/* Messages */
+.cb-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.cb-messages::-webkit-scrollbar { width: 3px; }
+.cb-messages::-webkit-scrollbar-thumb { background: #2a2a32; border-radius: 2px; }
+
+.cb-msg { display: flex; max-width: 88%; }
+.cb-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.cb-msg.bot  { align-self: flex-start; }
+
+.cb-bubble {
+  padding: .6rem .9rem;
+  border-radius: 14px;
+  font-size: .82rem;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.cb-msg.user .cb-bubble {
+  background: #6c47ff;
+  color: #fff;
+  border-bottom-right-radius: 3px;
+}
+.cb-msg.bot .cb-bubble {
+  background: #1e1e24;
+  color: rgba(255,255,255,.87);
+  border: 1px solid rgba(255,255,255,.06);
+  border-bottom-left-radius: 3px;
+}
+
+/* Typing indicator */
+.cb-typing-wrap { align-self: flex-start; }
+.cb-typing {
+  display: flex; gap: 4px; align-items: center;
+  padding: .65rem .9rem;
+  background: #1e1e24;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 14px;
+  border-bottom-left-radius: 3px;
+}
+.cb-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%; background: #666;
+  animation: cbBounce 1.3s infinite;
+}
+.cb-dot:nth-child(2) { animation-delay: .15s; }
+.cb-dot:nth-child(3) { animation-delay: .3s; }
+@keyframes cbBounce {
+  0%,100% { transform: translateY(0); opacity: .4; }
+  50%      { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Suggestions */
+.cb-suggestions {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+  padding: 0 1rem .65rem;
+  flex-shrink: 0;
+}
+.cb-chip {
+  padding: .28rem .75rem;
+  border-radius: 20px;
+  border: 1px solid rgba(108,71,255,.4);
+  background: rgba(108,71,255,.1);
+  color: #a78bfa;
+  font-size: .72rem;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+.cb-chip:hover { background: rgba(108,71,255,.25); border-color: #6c47ff; color: #fff; }
+
+/* Input */
+.cb-input-row {
+  display: flex; gap: .5rem;
+  padding: .7rem 1rem;
+  border-top: 1px solid rgba(255,255,255,.07);
+  flex-shrink: 0;
+}
+.cb-input {
+  flex: 1;
+  background: #1e1e24;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 10px;
+  color: #fff;
+  font-family: inherit;
+  font-size: .82rem;
+  padding: .55rem .85rem;
+  outline: none;
+  transition: border-color .2s;
+}
+.cb-input:focus { border-color: #6c47ff; }
+.cb-input::placeholder { color: #3a3a44; }
+.cb-send {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: #6c47ff;
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s, transform .1s;
+  flex-shrink: 0;
+}
+.cb-send:hover   { background: #7d5bff; }
+.cb-send:active  { transform: scale(.94); }
+.cb-send:disabled { background: #333; cursor: not-allowed; }
+.cb-send svg {
+  width: 15px; height: 15px;
+  stroke: white; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* Mobile */
+@media (max-width: 440px) {
+  .cb-window { width: calc(100vw - 2rem); right: 1rem; bottom: 5.5rem; height: 72vh; }
+  .cb-btn    { bottom: 1.25rem; right: 1.25rem; }
+}
