@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="tickets.css"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
 
@@ -272,6 +273,39 @@
         <div class="cat-grid" id="cat-grid"></div>
       </div>
 
+      <!-- ─── INVOICES ─── -->
+      <div class="view" id="view-invoices">
+        <div class="page-header">
+          <div><h1 id="inv-heading">Invoices</h1><p id="inv-subheading"></p></div>
+          <button class="btn-primary" id="new-invoice-btn" style="display:none">+ Create Invoice</button>
+        </div>
+        <div class="filters">
+          <button class="filter-btn active" data-inv-filter="all">All</button>
+          <button class="filter-btn" data-inv-filter="pending">Pending</button>
+          <button class="filter-btn" data-inv-filter="paid">Paid</button>
+          <button class="filter-btn" data-inv-filter="overdue">Overdue</button>
+          <select class="filter-select" id="inv-client-filter" style="display:none">
+            <option value="all">All Clients</option>
+          </select>
+        </div>
+        <div class="ticket-table-wrap">
+          <table class="ticket-table">
+            <thead>
+              <tr>
+                <th>Invoice ID</th><th>Description</th><th>Client</th><th>Amount</th>
+                <th>Due Date</th><th>Status</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="invoices-tbody"></tbody>
+          </table>
+          <div class="empty-state" id="inv-empty-state">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <p>No invoices found</p>
+            <button class="btn-primary" id="inv-empty-create-btn" style="display:none">Create Invoice</button>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </main>
 </div><!-- /app -->
@@ -436,6 +470,98 @@
         <button type="submit" class="btn-primary">Add Category</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ═══ CREATE INVOICE MODAL ═══ -->
+<div class="modal-overlay" id="inv-modal-overlay">
+  <div class="modal" style="max-width:500px">
+    <button class="modal-close" id="inv-modal-close">&times;</button>
+    <h2 style="margin-bottom:1.5rem" id="inv-modal-title">Create Invoice</h2>
+    <form id="inv-form">
+      <input type="hidden" id="inv-edit-id"/>
+      <div class="form-group">
+        <label>Description <span class="req">*</span></label>
+        <input type="text" id="inv-desc" placeholder="e.g. Remote IT Support — March 2026" required/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Client <span class="req">*</span></label>
+          <select id="inv-client" required></select>
+        </div>
+        <div class="form-group">
+          <label>Amount (₹) <span class="req">*</span></label>
+          <input type="number" id="inv-amount" placeholder="e.g. 5000" min="1" required/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Due Date <span class="req">*</span></label>
+          <input type="date" id="inv-due" required/>
+        </div>
+        <div class="form-group">
+          <label>Linked Ticket <span style="color:var(--gray);font-size:.72rem">(optional)</span></label>
+          <select id="inv-ticket"><option value="">None</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes <span style="color:var(--gray);font-size:.72rem">(optional)</span></label>
+        <textarea id="inv-notes" rows="3" placeholder="Any additional notes for the client…"></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" id="inv-modal-cancel">Cancel</button>
+        <button type="submit" class="btn-primary" id="inv-submit-btn">Create Invoice</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ INVOICE DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="inv-detail-overlay">
+  <div class="modal" style="max-width:520px">
+    <button class="modal-close" id="inv-detail-close">&times;</button>
+    <div class="modal-header">
+      <div>
+        <div class="modal-id" id="inv-detail-id"></div>
+        <h2 id="inv-detail-desc"></h2>
+      </div>
+      <span class="badge" id="inv-detail-status-badge"></span>
+    </div>
+    <div class="modal-body">
+      <div class="modal-meta">
+        <div><label>Client</label><span id="inv-detail-client"></span></div>
+        <div><label>Amount</label><span id="inv-detail-amount" style="font-size:1.1rem;font-weight:800;color:var(--green)"></span></div>
+        <div><label>Due Date</label><span id="inv-detail-due"></span></div>
+        <div><label>Linked Ticket</label><span id="inv-detail-ticket"></span></div>
+        <div><label>Created</label><span id="inv-detail-created"></span></div>
+        <div><label>Paid On</label><span id="inv-detail-paid"></span></div>
+      </div>
+      <div class="modal-section" id="inv-detail-notes-sec" style="display:none">
+        <label>Notes</label>
+        <p id="inv-detail-notes"></p>
+      </div>
+      <!-- Pay button — shown to user if pending -->
+      <div id="inv-pay-section" style="display:none">
+        <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:12px;padding:1.1rem;text-align:center">
+          <p style="font-size:.82rem;color:var(--gray);margin-bottom:1rem">Pay securely via UPI, Cards, Net Banking or EMI</p>
+          <button class="btn-primary" id="inv-pay-btn" style="background:linear-gradient(135deg,#22c55e,#16a34a);width:100%;justify-content:center;font-size:1rem">
+            Pay ₹<span id="inv-pay-amount"></span>
+          </button>
+          <p style="font-size:.68rem;color:var(--gray);margin-top:.6rem">Powered by Razorpay · 100% Secure</p>
+        </div>
+      </div>
+      <!-- Admin actions -->
+      <div id="inv-admin-section" style="display:none">
+        <div style="display:flex;gap:.75rem">
+          <button class="btn-secondary" style="flex:1;justify-content:center" id="inv-copy-link-btn">Copy Pay Link</button>
+          <button class="btn-primary" style="flex:1;justify-content:center;background:var(--green)" id="inv-mark-paid-btn">Mark as Paid</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" id="inv-delete-btn" style="display:none">Delete</button>
+      <button class="btn-secondary" id="inv-edit-btn">Edit</button>
+    </div>
   </div>
 </div>
 

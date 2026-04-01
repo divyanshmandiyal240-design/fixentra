@@ -38,8 +38,20 @@ const K = {
   tickets:    'tf_tickets',
   categories: 'tf_categories',
   clients:    'tf_clients',
+  invoices:   'tf_invoices',
   session:    'tf_session',
   version:    'tf_version',
+};
+
+// ── RAZORPAY CONFIG ──────────────────────────────────────────────────────────
+// After signing up at razorpay.com, paste your Key ID below.
+// The Key Secret goes into the Cloudflare Worker as a secret — never here.
+const RZP = {
+  keyId:      'YOUR_RAZORPAY_KEY_ID',   // e.g. rzp_test_xxxxxxxxxxxxxx
+  workerUrl:  'YOUR_WORKER_URL',        // same Cloudflare Worker URL
+  businessName: 'Fixentra IT Solution',
+  logo:       'https://divyanshmandiyal240-design.github.io/fixentra/logo-icon.svg',
+  theme:      '#6c47ff',
 };
 
 // If data version is outdated, reset users & session so new seed runs cleanly
@@ -87,6 +99,9 @@ function seedData() {
   if (!ls(K.tickets)) {
     save(K.tickets, []);
   }
+  if (!ls(K.invoices)) {
+    save(K.invoices, []);
+  }
 }
 
 function ago(days) { return new Date(Date.now() - 86400000 * days).toISOString(); }
@@ -98,6 +113,7 @@ function getUsers()      { return ls(K.users)      || []; }
 function getTickets()    { return ls(K.tickets)    || []; }
 function getCategories() { return ls(K.categories) || []; }
 function getClients()    { return ls(K.clients)    || []; }
+function getInvoices()   { return ls(K.invoices)   || []; }
 function getSession()    { return ls(K.session); }
 
 // ── PORTAL DETECTION ─────────────────────────────────────────────────────────
@@ -175,6 +191,7 @@ function navItems() {
   if (CAN.manageUsers())       base.push({ view:'users',      icon:usersIcon,   label:'Manage Users' });
   if (CAN.manageClients())     base.push({ view:'clients',    icon:clientIcon,  label:'Clients' });
   if (CAN.manageCategories())  base.push({ view:'categories', icon:tagIcon,     label:'Categories' });
+  base.push({ view:'invoices', icon:invoiceIcon, label: currentUser.role==='admin'?'Invoices':'My Invoices' });
   return base;
 }
 
@@ -184,7 +201,8 @@ const ticketIcon = `<svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2
 const plusIcon   = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
 const usersIcon  = `<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`;
 const tagIcon    = `<svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
-const clientIcon = `<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>`;
+const clientIcon  = `<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>`;
+const invoiceIcon = `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
 
 // ── LOGIN ────────────────────────────────────────────────────────────────────
 function initLogin() {
@@ -306,6 +324,7 @@ function bootApp(user) {
 
   // Default view
   switchView('dashboard');
+  checkPayParam();
 }
 
 function buildNav() {
@@ -349,6 +368,7 @@ function switchView(name) {
   if (name === 'users')       renderUsers();
   if (name === 'clients')     renderClients();
   if (name === 'categories')  renderCategories();
+  if (name === 'invoices')    renderInvoices();
 
   document.getElementById('sidebar').classList.remove('open');
 }
@@ -1107,6 +1127,344 @@ document.getElementById('cat-modal-cancel').addEventListener('click', closeCatMo
 document.getElementById('cat-modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('cat-modal-overlay')) closeCatModal();
 });
+
+// ── INVOICE MANAGEMENT ───────────────────────────────────────────────────────
+let invFilterStatus = 'all';
+let invFilterClient = 'all';
+let editingInvId    = null;
+
+function genInvId() {
+  const all = getInvoices();
+  const num = all.length + 1;
+  return 'INV-' + String(num).padStart(5, '0');
+}
+
+function invStatusColor(s) {
+  return { pending:'#f59e0b', paid:'#22c55e', overdue:'#ef4444' }[s] || '#888';
+}
+
+function isOverdue(inv) {
+  return inv.status === 'pending' && new Date(inv.dueDate) < new Date();
+}
+
+function getInvStatus(inv) {
+  return isOverdue(inv) ? 'overdue' : inv.status;
+}
+
+function renderInvoices() {
+  const isAdmin = currentUser.role === 'admin';
+  document.getElementById('inv-heading').textContent    = isAdmin ? 'Invoices' : 'My Invoices';
+  document.getElementById('inv-subheading').textContent = isAdmin ? 'Manage and send invoices to clients' : 'View and pay your outstanding invoices';
+  document.getElementById('new-invoice-btn').style.display   = isAdmin ? 'inline-flex' : 'none';
+  document.getElementById('inv-empty-create-btn').style.display = isAdmin ? 'inline-flex' : 'none';
+
+  // Client filter (admin only)
+  const cf = document.getElementById('inv-client-filter');
+  if (isAdmin) {
+    cf.style.display = 'block';
+    cf.innerHTML = '<option value="all">All Clients</option>' +
+      getClients().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  } else {
+    cf.style.display = 'none';
+  }
+
+  let list = getInvoices();
+  if (!isAdmin) list = list.filter(i => i.clientId === currentUser.clientId);
+  if (invFilterStatus !== 'all') list = list.filter(i => getInvStatus(i) === invFilterStatus);
+  if (invFilterClient !== 'all') list = list.filter(i => i.clientId === invFilterClient);
+  list = list.slice().reverse();
+
+  const tbody  = document.getElementById('invoices-tbody');
+  const empty  = document.getElementById('inv-empty-state');
+
+  if (!list.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'flex';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = list.map(inv => {
+    const status = getInvStatus(inv);
+    const color  = invStatusColor(status);
+    const client = getClients().find(c => c.id === inv.clientId);
+    return `<tr onclick="openInvDetail('${inv.id}')" style="cursor:pointer">
+      <td style="font-family:monospace;font-size:.78rem;font-weight:700">${esc(inv.id)}</td>
+      <td style="font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(inv.description)}</td>
+      <td>${client ? `<span style="color:${client.color};font-weight:600;font-size:.8rem">${esc(client.name)}</span>` : '—'}</td>
+      <td style="font-weight:700;font-size:.95rem">₹${Number(inv.amount).toLocaleString('en-IN')}</td>
+      <td style="color:${status==='overdue'?'var(--red)':'var(--gray)'};font-size:.8rem">${fmtDate(inv.dueDate)}</td>
+      <td><span class="badge" style="background:${color}22;color:${color}">${status.charAt(0).toUpperCase()+status.slice(1)}</span></td>
+      <td onclick="event.stopPropagation()">
+        <div class="action-btns">
+          ${isAdmin ? `<button class="btn-icon" onclick="openInvDetail('${inv.id}')">View</button>` : ''}
+          ${!isAdmin && status !== 'paid' ? `<button class="btn-icon" style="border-color:var(--green);color:var(--green)" onclick="openInvDetail('${inv.id}')">Pay Now</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Invoice filters
+document.querySelectorAll('[data-inv-filter]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-inv-filter]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    invFilterStatus = btn.dataset.invFilter;
+    renderInvoices();
+  });
+});
+document.getElementById('inv-client-filter').addEventListener('change', e => {
+  invFilterClient = e.target.value; renderInvoices();
+});
+
+// Open create modal
+document.getElementById('new-invoice-btn').addEventListener('click', openCreateInvoice);
+document.getElementById('inv-empty-create-btn').addEventListener('click', openCreateInvoice);
+
+function openCreateInvoice(editId) {
+  editingInvId = typeof editId === 'string' ? editId : null;
+  const modal  = document.getElementById('inv-modal-overlay');
+
+  // Populate clients
+  document.getElementById('inv-client').innerHTML =
+    '<option value="">Select client…</option>' +
+    getClients().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+
+  // Populate tickets
+  document.getElementById('inv-ticket').innerHTML =
+    '<option value="">None</option>' +
+    getTickets().map(t => `<option value="${t.id}">${t.id} — ${esc(t.title.slice(0,40))}</option>`).join('');
+
+  // Set default due date to 7 days from now
+  const d = new Date(); d.setDate(d.getDate() + 7);
+  document.getElementById('inv-due').value = d.toISOString().split('T')[0];
+
+  if (editingInvId) {
+    const inv = getInvoices().find(i => i.id === editingInvId);
+    if (!inv) return;
+    document.getElementById('inv-modal-title').textContent  = 'Edit Invoice';
+    document.getElementById('inv-submit-btn').textContent   = 'Save Changes';
+    document.getElementById('inv-desc').value    = inv.description;
+    document.getElementById('inv-client').value  = inv.clientId;
+    document.getElementById('inv-amount').value  = inv.amount;
+    document.getElementById('inv-due').value     = inv.dueDate;
+    document.getElementById('inv-ticket').value  = inv.ticketId || '';
+    document.getElementById('inv-notes').value   = inv.notes || '';
+  } else {
+    document.getElementById('inv-modal-title').textContent = 'Create Invoice';
+    document.getElementById('inv-submit-btn').textContent  = 'Create Invoice';
+    document.getElementById('inv-form').reset();
+    document.getElementById('inv-due').value = d.toISOString().split('T')[0];
+  }
+  closeInvDetail();
+  modal.classList.add('open');
+}
+
+document.getElementById('inv-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const desc     = document.getElementById('inv-desc').value.trim();
+  const clientId = document.getElementById('inv-client').value;
+  const amount   = Number(document.getElementById('inv-amount').value);
+  const dueDate  = document.getElementById('inv-due').value;
+  const ticketId = document.getElementById('inv-ticket').value;
+  const notes    = document.getElementById('inv-notes').value.trim();
+
+  const invoices = getInvoices();
+  if (editingInvId) {
+    const idx = invoices.findIndex(i => i.id === editingInvId);
+    invoices[idx] = { ...invoices[idx], description:desc, clientId, amount, dueDate, ticketId, notes };
+    showToast('Invoice updated');
+  } else {
+    invoices.push({ id:genInvId(), description:desc, clientId, amount, dueDate, ticketId, notes,
+                    status:'pending', createdAt:new Date().toISOString(), paidAt:null,
+                    razorpayOrderId:null, razorpayPaymentId:null });
+    showToast('Invoice created!', 'success');
+  }
+  save(K.invoices, invoices);
+  closeInvModal();
+  renderInvoices();
+});
+
+function closeInvModal() {
+  document.getElementById('inv-modal-overlay').classList.remove('open');
+  editingInvId = null;
+}
+document.getElementById('inv-modal-close').addEventListener('click', closeInvModal);
+document.getElementById('inv-modal-cancel').addEventListener('click', closeInvModal);
+document.getElementById('inv-modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('inv-modal-overlay')) closeInvModal();
+});
+
+// Invoice detail
+function openInvDetail(id) {
+  const inv    = getInvoices().find(i => i.id === id);
+  if (!inv) return;
+  const status = getInvStatus(inv);
+  const color  = invStatusColor(status);
+  const client = getClients().find(c => c.id === inv.clientId);
+  const isAdmin = currentUser.role === 'admin';
+
+  document.getElementById('inv-detail-id').textContent      = inv.id;
+  document.getElementById('inv-detail-desc').textContent    = inv.description;
+  document.getElementById('inv-detail-client').textContent  = client ? client.name : '—';
+  document.getElementById('inv-detail-client').style.color  = client ? client.color : '';
+  document.getElementById('inv-detail-amount').textContent  = '₹' + Number(inv.amount).toLocaleString('en-IN');
+  document.getElementById('inv-detail-due').textContent     = fmtDate(inv.dueDate);
+  document.getElementById('inv-detail-ticket').textContent  = inv.ticketId || '—';
+  document.getElementById('inv-detail-created').textContent = fmtDate(inv.createdAt);
+  document.getElementById('inv-detail-paid').textContent    = inv.paidAt ? fmtDate(inv.paidAt) : '—';
+
+  const badge = document.getElementById('inv-detail-status-badge');
+  badge.textContent  = status.charAt(0).toUpperCase() + status.slice(1);
+  badge.className    = 'badge';
+  badge.style.background = color + '22';
+  badge.style.color  = color;
+
+  const notesSec = document.getElementById('inv-detail-notes-sec');
+  if (inv.notes) {
+    notesSec.style.display = 'block';
+    document.getElementById('inv-detail-notes').textContent = inv.notes;
+  } else {
+    notesSec.style.display = 'none';
+  }
+
+  // Pay button — user only, pending invoice
+  const paySec = document.getElementById('inv-pay-section');
+  if (!isAdmin && status !== 'paid') {
+    paySec.style.display = 'block';
+    document.getElementById('inv-pay-amount').textContent = Number(inv.amount).toLocaleString('en-IN');
+    document.getElementById('inv-pay-btn').onclick = () => initiatePayment(inv.id);
+  } else {
+    paySec.style.display = 'none';
+  }
+
+  // Admin actions
+  const adminSec = document.getElementById('inv-admin-section');
+  if (isAdmin && status !== 'paid') {
+    adminSec.style.display = 'block';
+    document.getElementById('inv-mark-paid-btn').onclick = () => markInvoicePaid(inv.id);
+    document.getElementById('inv-copy-link-btn').onclick = () => copyInvLink(inv.id);
+  } else {
+    adminSec.style.display = 'none';
+  }
+
+  document.getElementById('inv-delete-btn').style.display = isAdmin ? 'inline-flex' : 'none';
+  document.getElementById('inv-delete-btn').onclick = () => deleteInvoice(inv.id);
+  document.getElementById('inv-edit-btn').style.display   = isAdmin ? 'inline-flex' : 'none';
+  document.getElementById('inv-edit-btn').onclick   = () => openCreateInvoice(inv.id);
+
+  document.getElementById('inv-detail-overlay').classList.add('open');
+}
+
+function closeInvDetail() {
+  document.getElementById('inv-detail-overlay').classList.remove('open');
+}
+document.getElementById('inv-detail-close').addEventListener('click', closeInvDetail);
+document.getElementById('inv-detail-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('inv-detail-overlay')) closeInvDetail();
+});
+
+function markInvoicePaid(id) {
+  const invoices = getInvoices();
+  const idx = invoices.findIndex(i => i.id === id);
+  invoices[idx] = { ...invoices[idx], status:'paid', paidAt:new Date().toISOString() };
+  save(K.invoices, invoices);
+  closeInvDetail();
+  renderInvoices();
+  showToast('Invoice marked as paid');
+}
+
+function deleteInvoice(id) {
+  if (!confirm('Delete this invoice?')) return;
+  save(K.invoices, getInvoices().filter(i => i.id !== id));
+  closeInvDetail();
+  renderInvoices();
+  showToast('Invoice deleted', 'error');
+}
+
+function copyInvLink(id) {
+  const url = `${window.location.href.split('?')[0]}?pay=${id}`;
+  navigator.clipboard.writeText(url).then(() => showToast('Payment link copied!', 'info'));
+}
+
+// Auto-open invoice if ?pay=INV-xxxxx in URL
+function checkPayParam() {
+  const invId = new URLSearchParams(window.location.search).get('pay');
+  if (invId) {
+    const inv = getInvoices().find(i => i.id === invId);
+    if (inv) setTimeout(() => { switchView('invoices'); openInvDetail(invId); }, 300);
+  }
+}
+
+// ── RAZORPAY PAYMENT ─────────────────────────────────────────────────────────
+async function initiatePayment(invId) {
+  if (RZP.keyId === 'YOUR_RAZORPAY_KEY_ID') {
+    showToast('Payment gateway not configured yet. Please contact us.', 'error');
+    return;
+  }
+  const inv    = getInvoices().find(i => i.id === invId);
+  const client = getClients().find(c => c.id === inv.clientId);
+  const user   = currentUser;
+
+  showToast('Preparing payment…', 'info');
+
+  try {
+    // Create order via Cloudflare Worker
+    const res = await fetch(RZP.workerUrl + '/razorpay/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: inv.amount * 100, currency: 'INR', receipt: invId }),
+    });
+    const order = await res.json();
+
+    const options = {
+      key:         RZP.keyId,
+      amount:      order.amount,
+      currency:    order.currency,
+      order_id:    order.id,
+      name:        RZP.businessName,
+      description: inv.description,
+      image:       RZP.logo,
+      prefill: {
+        name:  user.name,
+        email: user.username,
+      },
+      theme: { color: RZP.theme },
+      handler: async (response) => {
+        // Verify payment via Cloudflare Worker
+        const vRes = await fetch(RZP.workerUrl + '/razorpay/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpay_order_id:   response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature:  response.razorpay_signature,
+          }),
+        });
+        const v = await vRes.json();
+        if (v.success) {
+          const invoices = getInvoices();
+          const idx = invoices.findIndex(i => i.id === invId);
+          invoices[idx] = { ...invoices[idx], status:'paid', paidAt:new Date().toISOString(),
+                            razorpayOrderId: response.razorpay_order_id,
+                            razorpayPaymentId: response.razorpay_payment_id };
+          save(K.invoices, invoices);
+          closeInvDetail();
+          renderInvoices();
+          showToast('Payment successful! Thank you.', 'success');
+        } else {
+          showToast('Payment verification failed. Contact support.', 'error');
+        }
+      },
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.on('payment.failed', () => showToast('Payment failed. Please try again.', 'error'));
+    rzp.open();
+  } catch {
+    showToast('Could not initiate payment. Please try again.', 'error');
+  }
+}
 
 // ── MISC ─────────────────────────────────────────────────────────────────────
 document.getElementById('new-ticket-btn').addEventListener('click', () => {
